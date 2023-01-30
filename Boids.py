@@ -5,6 +5,10 @@ import random
 from PIL import Image, ImageFilter
 
 
+__version__ = "1.0.0-dev"
+__author__ = "Todo Lodo"
+
+
 def test(arr):
     print("test", arr)
     return arr
