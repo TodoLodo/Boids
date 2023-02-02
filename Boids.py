@@ -3,7 +3,7 @@ import numpy as np
 import math
 import random
 from PIL import Image, ImageFilter
-
+import json
 
 __version__ = "1.0.0-dev"
 __author__ = "Todo Lodo"
@@ -22,6 +22,7 @@ class Vector:
     """
     Vector class
     """
+
     def __init__(self, x: IntOrFloat = 0.0, y: IntOrFloat = 0.0) -> None:
         self.x = x
         self.y = y
@@ -32,7 +33,7 @@ class Vector:
 
     @property
     def angle(self, rel='x') -> float:
-        return math.degrees(math.acos(self.x/self.magnitude)) * -self.y/abs(self.y)
+        return math.degrees(math.acos(self.x / self.magnitude)) * -self.y / abs(self.y)
 
     @property
     def unitVector(self):
@@ -93,7 +94,10 @@ class Vector:
 
     @staticmethod
     def dot(a, b) -> IntOrFloat:
-        return a.x*b.x+a.y*b.y
+        return a.x * b.x + a.y * b.y
+
+
+zeroVector = Vector()
 
 
 class Entity:
@@ -148,13 +152,12 @@ class Entity:
         return Vector(self.x - size[0] / 2, self.y - size[1] / 2)
 
     def distance(self, entity):
-        return abs(self.shortTail[0]-entity.position)
+        return abs(self.shortTail[0] - entity.position)
 
     def relativeAngle(self, entity):
         a = self.velocity
         b = entity.position - self.position
-        angle = math.degrees(math.acos(Vector.dot(a,b)/(1 if (den:=abs(a)*abs(b)) == 0 else den)))
-        #print(angle)
+        angle = math.degrees(math.acos(Vector.dot(a, b) / (1 if (den := abs(a) * abs(b)) == 0 else den)))
         return angle
 
     # mutators
@@ -165,28 +168,31 @@ class Entity:
         self.__vel = self.__vel.unitVector * speed
         return self
 
-    def updateShortTail(self):
+    def updateShortTail(self) -> None:
         self.__shortTail = (self.position, self.velocity)
 
-    def sac(self, entities, visionRange: IntOrFloat, avoidRange: IntOrFloat, speed: IntOrFloat, separation: bool, alignment: bool, cohesion: bool):
-        neighbours = entities.entities[i:=np.where((entities.entities != self) & ((diff := self.vDistance(entities.entities)) <= visionRange) & (self.vRelativeAngle(entities.entities) <= 120))]
-
-        zero = Vector()  # zero Vector
+    def sac(self, entities, visionRange: IntOrFloat, avoidRange: IntOrFloat, speed: IntOrFloat, separation: bool,
+            alignment: bool, cohesion: bool):
+        neighbours = entities.entities[i := np.where(
+            (entities.entities != self) & ((diff := self.vDistance(entities.entities)) <= visionRange) & (
+                        self.vRelativeAngle(entities.entities) <= 120))]
 
         v1 = Vector()  # separation
-        v2 = sum((e.shortTail[1] * d / visionRange for e, d in zip(neighbours, visionRange-diff[i])), start=zero)  # alignment
-        v3 = sum((e.shortTail[0] for e in neighbours), start=zero)  # cohesion
+        v2 = sum((e.shortTail[1] * d / visionRange for e, d in zip(neighbours, visionRange - diff[i])),
+                 start=zeroVector)  # alignment
+        v3 = sum((e.shortTail[0] for e in neighbours), start=zeroVector)  # cohesion
 
         if len(neighbours):
-            closeNeighbours = neighbours[i := np.where((diff:=self.vDistance(neighbours)) <= avoidRange)]
+            closeNeighbours = neighbours[i := np.where((diff := self.vDistance(neighbours)) <= avoidRange)]
 
-            v1 = -sum(((e.shortTail[0] - self.position) * d/avoidRange for e, d in zip(closeNeighbours, avoidRange-diff[i])), start=zero)   # separation
+            v1 = -sum(((e.shortTail[0] - self.position) * d / avoidRange for e, d in
+                       zip(closeNeighbours, avoidRange - diff[i])), start=zeroVector)  # separation
 
-        numEntities = 1 if (l:=len(neighbours)) == 0 else l
+        numEntities = 1 if (l := len(neighbours)) == 0 else l
 
-        v1 = v1 if separation else zero
-        v2 = v2/numEntities if alignment else zero
-        v3 = v3/numEntities if cohesion else zero
+        v1 = v1 if separation else zeroVector
+        v2 = v2 / numEntities if alignment else zeroVector
+        v3 = v3 / numEntities if cohesion else zeroVector
 
         self.__vel += v1.unitVector * speed * 0.03 + v2.unitVector * speed * 0.03 + v3.unitVector * speed * 0.03
 
@@ -232,19 +238,17 @@ class Entities:
 
 class Main:
     def __init__(self):
-        self.targetFPS = 240
-        self.entityTravelTime = 5
-        self.entitySize = (50, 50)
+        with open("config.json", "r") as f:
+            for key, val in json.load(f).items():
+                setattr(self, key, val)
 
-        self.avoidRange = 40
-        self.visionRange = 200
-        self.visionAngle = 120
-        self.visionRadRange = math.radians(self.visionAngle)
+        print(self.hotKeys)
+
+        self.visionRadAngle = math.radians(self.entityVisionAngle)
 
         self.textPadding = 20
 
         self.running = True
-        self.debug = True
 
         pygame.init()
 
@@ -255,11 +259,12 @@ class Main:
         self.arrowb = self.processImage((145, 149, 255))
         self.arrowo = self.processImage((255, 150, 109))
 
-        self.entities = Entities(n=20, speed=self.entitySpeed(), size=self.entitySize)
+        self.entities = Entities(n=self.entityCount, speed=self.entitySpeed(), size=(self.entitySize, self.entitySize))
 
         self.run()
 
-    def entitySpeed(self, diagonal: IntOrFloat = 1080.00, fps: IntOrFloat = None, seconds: IntOrFloat = 10.00) -> IntOrFloat:
+    def entitySpeed(self, diagonal: IntOrFloat = 1080.00, fps: IntOrFloat = None,
+                    seconds: IntOrFloat = 10.00) -> IntOrFloat:
         fps = self.targetFPS if fps is None or fps == 0 else fps
         return diagonal / (seconds * fps)
 
@@ -271,21 +276,57 @@ class Main:
 
         for x in range(w):
             for y in range(h):
-                if (px := pixels[x, y]) != (0, 0, 0, 0):
+                if pixels is not None and (px := pixels[x, y]) != (0, 0, 0, 0):
                     c = tuple(list(col) + [px[3]])
                     pixels[x, y] = tuple(list(col) + [px[3]])
 
-        return img.rotate(-45, expand=True).resize((50, 50))
+        return img.rotate(-45, expand=True).resize((50, 50)).filter(ImageFilter.SMOOTH_MORE)
+
+    @staticmethod
+    def drawSector(screen: pygame.display, color: tuple[int, int, int], center: Vector, radius: IntOrFloat,
+                   angle: IntOrFloat, offsetAngle: IntOrFloat):
+        length = radius * 2
+        halfAngle = angle / 2
+        pygame.draw.arc(screen, color, (center.x - radius, center.y - radius, length, length), offsetAngle - halfAngle,
+                        offsetAngle + halfAngle)
+        # pygame.draw.arc(screen, (0, 255, 0), (e.position.x-self.entityVisionRange/2, e.position.y-self.entityVisionRange/2, self.entityVisionRange, self.entityVisionRange), e.radAngle-self.visionRadAngle/2, e.radAngle+self.visionRadAngle/2)
+
+    # Hot Keys
+    def hotKeyFunction(self, i):
+        try:
+            getattr(self, self.hotKeys.get(str(i)))()
+        except Exception:
+            pass
+
+    def toggleShowStats(self):
+        self.showStats = not self.showStats
+
+    def reduceEntityTravelTime(self):
+        self.entityTravelTime += 1 if self.entityTravelTime < self.maxEntityTravelTime else 0
+
+    def increaseEntityTravelTime(self):
+        self.entityTravelTime -= 1 if self.entityTravelTime > self.minEntityTravelTime else 0
+
+    def toggleSeparation(self):
+        self.separation = not self.separation
+
+    def toggleAlignment(self):
+        self.alignment = not self.alignment
+
+    def toggleCohesion(self):
+        self.cohesion= not self.cohesion
+
+    def toggleDrawRect(self):
+        self.drawRect = not self.drawRect
+
+    def togglePause(self):
+        self.pause = not self.pause
+
+    def exit(self):
+        raise SystemExit
 
     def run(self):
         self.running = True
-        drawRect = False
-        pause = False
-        showStats = False
-
-        separation = False
-        alignment = False
-        cohesion = False
 
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
@@ -306,55 +347,56 @@ class Main:
                     if event.type == pygame.QUIT:
                         self.running = False
                     if event.type == pygame.KEYDOWN:
-                        print(f"\n\n{event.key}\n\n")
-                        if event.key == 27:
-                            raise SystemExit
-                        if event.key == 9:
-                            showStats = not showStats
-                        if event.key == 49:
-                            separation = not separation
-                        if event.key == 50:
-                            alignment = not alignment
-                        if event.key == 51:
-                            cohesion = not cohesion
-                        if event.key == 92:
-                            drawRect = not drawRect
-                        if event.key == 32:
-                            pause = not pause
+                        #print(f"\n\n{event.key}\n\n")
+                        self.hotKeyFunction(event.key)
 
-                if not pause:
+                fps = clock.get_fps()
+                speed = self.entitySpeed(diagonal=diagonal, fps=fps, seconds=self.entityTravelTime)
+
+                if not self.pause:
                     screen.fill(color="#1E1E1E")
-                    speed = self.entitySpeed(diagonal=diagonal, fps=clock.get_fps(), seconds=self.entityTravelTime)
 
                     list(map(lambda e: (
                         e.sac(entities=self.entities,
-                              visionRange=self.visionRange,
-                              avoidRange=self.avoidRange,
+                              visionRange=self.entityVisionRange,
+                              avoidRange=self.entityAvoidRange,
                               speed=speed,
-                              separation=separation,
-                              alignment=alignment,
-                              cohesion=cohesion).speedAdjust(speed=speed).move(),
-                        tmp := getattr(self, f'arrow{e.color}').rotate(a := e.angle, expand=True).filter(ImageFilter.SMOOTH_MORE),
-                        screen.blit(pim := pygame.image.fromstring(tmp.tobytes(), tmp.size, tmp.mode), pos := tuple(e.getDrawPosition(tmp.size))),
-                        (pygame.draw.circle(screen, (255, 0, 0), tuple(e.position), self.avoidRange, 1),
-                         pygame.draw.arc(screen, (0, 255, 0), (e.position.x-self.visionRange/2, e.position.y-self.visionRange/2, self.visionRange, self.visionRange), e.radAngle-self.visionRadRange/2, e.radAngle+self.visionRadRange/2))if drawRect else None
+                              separation=self.separation,
+                              alignment=self.alignment,
+                              cohesion=self.cohesion).speedAdjust(speed=speed).move(),
+                        tmp := getattr(self, f'arrow{e.color}').rotate(a := e.angle, expand=True),
+                        screen.blit(pim := pygame.image.fromstring(tmp.tobytes(), tmp.size, tmp.mode),
+                                    pos := tuple(e.getDrawPosition(tmp.size))),
+                        (self.drawSector(screen, (255, 0, 0), e.position, self.entityAvoidRange, self.visionRadAngle,
+                                         e.radAngle),
+                         self.drawSector(screen, (0, 255, 0), e.position, self.entityVisionRange, self.visionRadAngle,
+                                         e.radAngle)) if self.drawRect else None
                     ), self.entities))
 
                     self.entities.updateAllShortTails()
 
                 # texts (stats <Tab>)
-                if showStats:
+                if self.showStats:
                     # fps
-                    screen.blit(font.render(str(int(fps := clock.get_fps())), True, (254, 233, 225)), (self.textPadding, self.textPadding))
+                    screen.blit(font.render(str(int(fps)), True, (254, 233, 225)), (self.textPadding, self.textPadding))
                     # separation state
-                    screen.blit(r1stat := font.render(f"separation: {separation}", True, (254, 233, 225)),
-                                (width-self.textPadding-r1stat.get_size()[0], self.textPadding))
+                    screen.blit(r1stat := font.render(f"separation: {self.separation}", True, (254, 233, 225)),
+                                (width - self.textPadding - r1stat.get_size()[0], self.textPadding))
                     # alignment state
-                    screen.blit(r2stat := font.render(f"alignment: {alignment}", True, (254, 233, 225)),
-                                (width - self.textPadding - r2stat.get_size()[0], self.textPadding*2+r1stat.get_size()[1]))
+                    screen.blit(r2stat := font.render(f"alignment: {self.alignment}", True, (254, 233, 225)),
+                                (width - self.textPadding - r2stat.get_size()[0],
+                                 self.textPadding * 2 + r1stat.get_size()[1]))
                     # cohesion state
-                    screen.blit(r3stat := font.render(f"cohesion: {cohesion}", True, (254, 233, 225)),
-                                (width - self.textPadding - r3stat.get_size()[0], self.textPadding*3+r1stat.get_size()[1]++r2stat.get_size()[1]))
+                    screen.blit(r3stat := font.render(f"cohesion: {self.cohesion}", True, (254, 233, 225)),
+                                (width - self.textPadding - r3stat.get_size()[0],
+                                 self.textPadding * 3 + r1stat.get_size()[1] + r2stat.get_size()[1]))
+
+                    # speed
+                    screen.blit(
+                        r4stat := font.render(f"speed: {round(diagonal / self.entityTravelTime, ndigits=2)} pxl/s",
+                                              True, (254, 233, 225)),
+                        (width - self.textPadding - r4stat.get_size()[0],
+                         self.textPadding * 4 + r1stat.get_size()[1] + r2stat.get_size()[1] + r3stat.get_size()[1]))
 
                 pygame.display.flip()
                 clock.tick(self.targetFPS)

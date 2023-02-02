@@ -1,0 +1,28 @@
+{
+  "targetFPS": 240,
+  "entityCount": 20,
+  "entityTravelTime": 20,
+  "minEntityTravelTime": 1,
+  "maxEntityTravelTime": 20,
+  "entitySize": 50,
+  "entityAvoidRange": 40,
+  "entityVisionRange" :  200,
+  "entityVisionAngle" : 120,
+  "separation": false,
+  "alignment": false,
+  "cohesion": false,
+  "drawRect": false,
+  "pause": false,
+  "showStats": false,
+  "hotKeys" : {
+    "9": "toggleShowStats",
+    "45": "reduceEntityTravelTime",
+    "61": "increaseEntityTravelTime",
+    "49": "toggleSeparation",
+    "50": "toggleAlignment",
+    "51": "toggleCohesion",
+    "92": "toggleDrawRect",
+    "32": "togglePause",
+    "27": "exit"
+  }
+}
