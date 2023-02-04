@@ -1,7 +1,7 @@
 {
   "targetFPS": 240,
   "entityCount": 20,
-  "entityTravelTime": 20,
+  "entityTravelTime": 10,
   "minEntityTravelTime": 1,
   "maxEntityTravelTime": 20,
   "entitySize": 50,

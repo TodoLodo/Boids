@@ -1,3 +1,5 @@
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import numpy as np
 import math
@@ -67,6 +69,9 @@ class Vector:
     #
     def copy(self):
         return Vector(self.x, self.y)
+
+    def rotate(self, angle: IntOrFloat=None, radAngle:IntOrFloat=None):
+        ...
 
     #
     def __iter__(self):
@@ -241,8 +246,6 @@ class Main:
         with open("config.json", "r") as f:
             for key, val in json.load(f).items():
                 setattr(self, key, val)
-
-        print(self.hotKeys)
 
         self.visionRadAngle = math.radians(self.entityVisionAngle)
 
